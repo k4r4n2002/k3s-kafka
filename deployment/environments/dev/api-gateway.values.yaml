@@ -1,0 +1,39 @@
+service:
+  name: api-gateway
+  image: karandh/api-gateway:latest
+  replicas: 1
+  port: 3001
+  type: NodePort
+  nodePort: 30081
+
+ingress:
+  enabled: true
+  host: api.displaydata.local
+
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  cpuThreshold: 70
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+configData:
+  SERVICE_NAME: "api-gateway"
+  ENVIRONMENT: "dev"
+  CONTENT_SERVICE_URL: "http://content-service:3002"
+  AUTH_SERVICE_URL: "http://auth-service:3004"
+  LOG_LEVEL: "debug"
+
+secretData:
+  JWT_SECRET: "bXktc2VjcmV0LWtleS1mb3ItZGV2" # my-secret-key-for-dev
+  API_KEY: "ZGV2LWFwaS1rZXk=" # dev-api-key
+
+networkPolicy:
+  enabled: false

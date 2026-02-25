@@ -1,0 +1,12 @@
+{
+    "name": "analytics-service",
+    "version": "1.0.0",
+    "description": "DisplayData — Analytics Ingestion & Retrieval Service",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js"
+    },
+    "dependencies": {
+        "express": "^4.21.2"
+    }
+}

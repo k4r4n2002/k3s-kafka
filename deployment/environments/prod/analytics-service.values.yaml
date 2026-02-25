@@ -1,0 +1,30 @@
+service:
+  name: analytics-service
+  image: karandh/analytics-service:latest
+  replicas: 2
+  port: 3003
+  type: ClusterIP
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  cpuThreshold: 70
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+configData:
+  SERVICE_NAME: "analytics-service"
+  ENVIRONMENT: "prod"
+  LOG_LEVEL: "info"
+
+secretData: {}
+
+networkPolicy:
+  enabled: true

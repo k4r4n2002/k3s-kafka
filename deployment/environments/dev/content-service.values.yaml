@@ -1,0 +1,28 @@
+service:
+  name: content-service
+  image: karandh/content-service:latest
+  replicas: 1
+  port: 3002
+  type: ClusterIP
+
+hpa:
+  enabled: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+configData:
+  SERVICE_NAME: "content-service"
+  ENVIRONMENT: "dev"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:3003"
+  LOG_LEVEL: "debug"
+
+secretData: {}
+
+networkPolicy:
+  enabled: false
