@@ -1,0 +1,32 @@
+service:
+  name: auth-service
+  image: karandh/auth-service:latest
+  replicas: 2
+  port: 3004
+  type: ClusterIP
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  cpuThreshold: 70
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+configData:
+  SERVICE_NAME: "auth-service"
+  ENVIRONMENT: "prod"
+  LOG_LEVEL: "info"
+
+secretData:
+  JWT_SECRET: "c3VwZXItc2VjcmV0LWtleS1mb3ItcHJvZA==" # super-secret-key-for-prod
+  API_KEY: "cHJvZC1hcGkta2V5LXNlY3VyZQ==" # prod-api-key-secure
+
+networkPolicy:
+  enabled: true

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dd-service.fullname" . }}
+  labels:
+    {{- include "dd-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.service.replicas }}
+  selector:
+    matchLabels:
+      {{- include "dd-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "dd-service.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ include "dd-service.fullname" . }}
+          image: "{{ .Values.service.image }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          envFrom:
+            {{- if and .Values.envFromConfig .Values.configData }}
+            - configMapRef:
+                name: {{ include "dd-service.fullname" . }}-config
+            {{- end }}
+            {{- if and .Values.envFromSecret .Values.secretData }}
+            - secretRef:
+                name: {{ include "dd-service.fullname" . }}-secret
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10

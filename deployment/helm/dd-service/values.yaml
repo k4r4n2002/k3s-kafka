@@ -1,0 +1,45 @@
+# ── Generic chart values ─────────────────────────────────────────────────────
+# These are the default values. They are intentionally left empty or disabled
+# where tenant-specific values are expected.
+
+service:
+  name: ""          # Required: e.g., api-gateway, content-service
+  image: ""         # Required: e.g., karandh/api-gateway:latest
+  replicas: 1
+  port: 3000
+  type: ClusterIP   # ClusterIP or NodePort
+  nodePort: null    # Valid only if type is NodePort (e.g., 30081)
+
+ingress:
+  enabled: false
+  host: ""          # Required if enabled, e.g., api.displaydata.local
+  className: ""     # e.g., traefik, nginx
+
+hpa:
+  enabled: false 
+  minReplicas: 1
+  maxReplicas: 3
+  cpuThreshold: 70
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+
+# ── Dynamic Configuration ────────────────────────────────────────────────────
+# The keys added to configData will be mounted as environment variables.
+configData: {}
+
+# The keys added to secretData will be mounted as environment variables.
+# Values must be base64 encoded.
+secretData: {}
+
+envFromConfig: true
+envFromSecret: true
+
+networkPolicy:
+  enabled: false
+  # If enabled, default policy denies all ingress except from specified sources.

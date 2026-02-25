@@ -1,0 +1,12 @@
+{{- if .Values.configData }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dd-service.fullname" . }}-config
+  labels:
+    {{- include "dd-service.labels" . | nindent 4 }}
+data:
+  {{- range $key, $val := .Values.configData }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}
+{{- end }}

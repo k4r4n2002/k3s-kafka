@@ -1,0 +1,29 @@
+service:
+  name: auth-service
+  image: karandh/auth-service:latest
+  replicas: 1
+  port: 3004
+  type: ClusterIP
+
+hpa:
+  enabled: false
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+configData:
+  SERVICE_NAME: "auth-service"
+  ENVIRONMENT: "dev"
+  LOG_LEVEL: "debug"
+
+secretData:
+  JWT_SECRET: "bXktc2VjcmV0LWtleS1mb3ItZGV2" # my-secret-key-for-dev
+  API_KEY: "ZGV2LWFwaS1rZXk=" # dev-api-key
+
+networkPolicy:
+  enabled: false
