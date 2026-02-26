@@ -3,12 +3,15 @@
 # Single combined broker+controller node, no persistence, no auth.
 # Replaces bitnami/kafka Helm chart for dev environment.
 # Topic provisioning is handled by the kafka-init Job below.
+#
+# NOTE: apache/kafka does NOT read KAFKA_* environment variables automatically
+# (unlike the Bitnami image). Configuration is applied by patching
+# server.properties directly in both the init container and the main container.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kafka-config
 data:
-  # Override key properties; rest use image defaults
   KAFKA_NODE_ID: "1"
   KAFKA_PROCESS_ROLES: "broker,controller"
   KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
@@ -66,15 +69,31 @@ spec:
             - /bin/bash
             - -c
             - |
-              # Generate a cluster ID and format storage (idempotent if already formatted)
+              # apache/kafka ignores KAFKA_* env vars — patch server.properties directly.
+              PROPS=/opt/kafka/config/kraft/server.properties
+
+              sed -i "s|^advertised.listeners=.*|advertised.listeners=PLAINTEXT://kafka.dd-dev.svc.cluster.local:9092|" "$PROPS"
+              sed -i "s|^listeners=.*|listeners=PLAINTEXT://:9092,CONTROLLER://:9093|" "$PROPS"
+              sed -i "s|^listener.security.protocol.map=.*|listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT|" "$PROPS"
+              sed -i "s|^controller.quorum.voters=.*|controller.quorum.voters=1@localhost:9093|" "$PROPS"
+              sed -i "s|^log.dirs=.*|log.dirs=/tmp/kraft-combined-logs|" "$PROPS"
+              sed -i "s|^node.id=.*|node.id=1|" "$PROPS"
+
+              grep -q "^offsets.topic.replication.factor"           "$PROPS" || echo "offsets.topic.replication.factor=1"           >> "$PROPS"
+              grep -q "^transaction.state.log.replication.factor"   "$PROPS" || echo "transaction.state.log.replication.factor=1"   >> "$PROPS"
+              grep -q "^transaction.state.log.min.isr"              "$PROPS" || echo "transaction.state.log.min.isr=1"              >> "$PROPS"
+              grep -q "^auto.create.topics.enable"                  "$PROPS" || echo "auto.create.topics.enable=true"               >> "$PROPS"
+
+              echo "--- Patched server.properties (relevant lines) ---"
+              grep -E "^(advertised\.listeners|listeners|node\.id|log\.dirs|controller\.quorum)" "$PROPS"
+              echo "--------------------------------------------------"
+
+              # Format storage (idempotent — safe to re-run)
               CLUSTER_ID=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
               /opt/kafka/bin/kafka-storage.sh format \
                 --ignore-formatted \
                 -t "$CLUSTER_ID" \
-                -c /opt/kafka/config/kraft/server.properties
-          envFrom:
-            - configMapRef:
-                name: kafka-config
+                -c "$PROPS"
           volumeMounts:
             - name: kafka-logs
               mountPath: /tmp/kraft-combined-logs
@@ -82,8 +101,31 @@ spec:
         - name: kafka
           image: apache/kafka:3.9.0
           command:
-            - /opt/kafka/bin/kafka-server-start.sh
-            - /opt/kafka/config/kraft/server.properties
+            - /bin/bash
+            - -c
+            - |
+              # Re-apply patches so the broker starts with the correct listeners.
+              # The init container already patched the file, but we re-apply here
+              # as a safety measure in case the image is ever updated.
+              PROPS=/opt/kafka/config/kraft/server.properties
+
+              sed -i "s|^advertised.listeners=.*|advertised.listeners=PLAINTEXT://kafka.dd-dev.svc.cluster.local:9092|" "$PROPS"
+              sed -i "s|^listeners=.*|listeners=PLAINTEXT://:9092,CONTROLLER://:9093|" "$PROPS"
+              sed -i "s|^listener.security.protocol.map=.*|listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT|" "$PROPS"
+              sed -i "s|^controller.quorum.voters=.*|controller.quorum.voters=1@localhost:9093|" "$PROPS"
+              sed -i "s|^log.dirs=.*|log.dirs=/tmp/kraft-combined-logs|" "$PROPS"
+              sed -i "s|^node.id=.*|node.id=1|" "$PROPS"
+
+              grep -q "^offsets.topic.replication.factor"           "$PROPS" || echo "offsets.topic.replication.factor=1"           >> "$PROPS"
+              grep -q "^transaction.state.log.replication.factor"   "$PROPS" || echo "transaction.state.log.replication.factor=1"   >> "$PROPS"
+              grep -q "^transaction.state.log.min.isr"              "$PROPS" || echo "transaction.state.log.min.isr=1"              >> "$PROPS"
+              grep -q "^auto.create.topics.enable"                  "$PROPS" || echo "auto.create.topics.enable=true"               >> "$PROPS"
+
+              echo "--- server.properties (relevant lines) ---"
+              grep -E "^(advertised\.listeners|listeners|node\.id|log\.dirs)" "$PROPS"
+              echo "------------------------------------------"
+
+              exec /opt/kafka/bin/kafka-server-start.sh "$PROPS"
           envFrom:
             - configMapRef:
                 name: kafka-config

@@ -45,7 +45,6 @@ async function connectKafka() {
         log('info', 'Kafka producer connected', { brokers: KAFKA_BROKERS, topic: KAFKA_TOPIC });
     } catch (err) {
         log('error', 'Kafka producer connection failed — will retry', { error: err.message });
-        // Retry after 5 seconds — service still starts so health checks pass
         setTimeout(connectKafka, 5000);
     }
 }
@@ -108,8 +107,8 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-    // Health check passes even if Kafka is temporarily unavailable
-    // Kafka reconnects in the background; the service itself is healthy
+    // Health check passes even if Kafka is temporarily unavailable.
+    // Kafka reconnects in the background; the service itself is healthy.
     res.json({ status: 'ok', service: SERVICE, env: ENV, kafka: kafkaReady ? 'connected' : 'reconnecting' });
 });
 
@@ -156,6 +155,7 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 // ── Start ───────────────────────────────────────────────────────────────────
-connectKafka().then(() => {
-    app.listen(PORT, () => log('info', `${SERVICE} listening`, { port: PORT }));
-});
+// HTTP server starts immediately so liveness/readiness probes pass from the start.
+// Kafka producer connects in the background and retries automatically on failure.
+app.listen(PORT, () => log('info', `${SERVICE} listening`, { port: PORT }));
+connectKafka();

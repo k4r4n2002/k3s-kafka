@@ -94,7 +94,7 @@ start_portforward() {
   local remote_port="$3"
   kubectl port-forward -n "$NAMESPACE" "svc/$svc" "${local_port}:${remote_port}" &>/dev/null &
   PF_PIDS+=($!)
-  sleep 2
+  sleep 10
 }
 
 cleanup() {

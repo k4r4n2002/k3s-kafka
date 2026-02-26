@@ -195,6 +195,7 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 // ── Start ───────────────────────────────────────────────────────────────────
-startConsumer().then(() => {
-    app.listen(PORT, () => log('info', `${SERVICE} listening`, { port: PORT }));
-});
+// HTTP server starts immediately so liveness/readiness probes pass from the start.
+// Kafka consumer connects in the background and retries automatically on failure.
+app.listen(PORT, () => log('info', `${SERVICE} listening`, { port: PORT }));
+startConsumer();
