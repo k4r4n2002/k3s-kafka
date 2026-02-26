@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   registry: docker.io
   repository: bitnami/kafka
-  tag: 3.9.0-debian-12-r12
+  tag: 3.9.0
 
 # KRaft mode (no ZooKeeper dependency — Kafka 3.3+)
 kraft:

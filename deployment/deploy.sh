@@ -12,7 +12,7 @@
 #   Each environment gets its own namespace: dd-<env> (e.g., dd-dev, dd-prod)
 #
 # Kafka:
-#   Deployed via Bitnami Helm chart (bitnami/kafka).
+#   Deployed via kubectl apply using apache/kafka:3.9.0 (KRaft mode).
 #   Automatically deployed before app services when --all is used.
 #   Use --kafka flag to deploy/upgrade Kafka independently.
 # =============================================================================
@@ -21,14 +21,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HELM_CHART="$SCRIPT_DIR/helm/dd-service"
-
-# Bitnami repo details
-BITNAMI_REPO_NAME="bitnami"
-BITNAMI_REPO_URL="https://charts.bitnami.com/bitnami"
-KAFKA_RELEASE_NAME="kafka"
-KAFKA_CHART="bitnami/kafka"
-# Pin to a stable chart version — bump intentionally
-KAFKA_CHART_VERSION="31.0.0"   # empty = use latest stable; pin after confirming a working version
 
 # Known application services (must match filenames in environments/<env>/*.values.yaml)
 ALL_SERVICES=(api-gateway content-service analytics-service auth-service)
@@ -46,7 +38,7 @@ while [[ $# -gt 0 ]]; do
     --service)    TARGET_SERVICE="$2"; shift 2 ;;
     --all)        DEPLOY_ALL=true; shift ;;
     --kafka)      DEPLOY_KAFKA=true; shift ;;
-    --dry-run)    DRY_RUN="--dry-run"; shift ;;
+    --dry-run)    DRY_RUN="--dry-run" ; shift ;;
     -h|--help)
       echo "Usage: $0 --env <env> [--service <name> | --all | --kafka] [--dry-run]"
       echo ""
@@ -107,53 +99,33 @@ if [ -z "$DRY_RUN" ]; then
   fi
 fi
 
-# ── Bitnami repo setup ───────────────────────────────────────────────────────
-ensure_bitnami_repo() {
-  if ! helm repo list 2>/dev/null | grep -q "^$BITNAMI_REPO_NAME"; then
-    echo "  Adding Bitnami Helm repo..."
-    helm repo add "$BITNAMI_REPO_NAME" "$BITNAMI_REPO_URL"
-  fi
-  echo "  Updating Bitnami repo cache..."
-  helm repo update "$BITNAMI_REPO_NAME"
-}
-
 # ── Deploy Kafka ─────────────────────────────────────────────────────────────
 deploy_kafka() {
-  local kafka_values="$ENV_DIR/kafka.values.yaml"
+  local kafka_manifest="$SCRIPT_DIR/kafka.yaml"
 
-  if [ ! -f "$kafka_values" ]; then
-    echo "  ✗ Skipping Kafka (no values file at $kafka_values)"
+  if [ ! -f "$kafka_manifest" ]; then
+    echo "  ✗ Kafka manifest not found at $kafka_manifest"
     return 1
   fi
 
-  ensure_bitnami_repo
-
   echo ""
-  echo "  Deploying: Kafka ($KAFKA_RELEASE_NAME)"
-  local chart_label="${KAFKA_CHART_VERSION:-latest}"
-  echo "  Chart:     $KAFKA_CHART @ $chart_label"
-  echo "  Values:    $kafka_values"
+  echo "  Deploying: Kafka (apache/kafka:3.9.0, KRaft mode)"
+  echo "  Manifest:  $kafka_manifest"
 
-  local version_flag=""
-  [ -n "$KAFKA_CHART_VERSION" ] && version_flag="--version $KAFKA_CHART_VERSION"
-
-  helm upgrade --install "$KAFKA_RELEASE_NAME" "$KAFKA_CHART" \
-    $version_flag \
-    --namespace "$NAMESPACE" \
-    --create-namespace \
-    -f "$kafka_values" \
-    --timeout 600s \
-    $DRY_RUN
-
-  if [ -z "$DRY_RUN" ]; then
-    echo ""
-    echo "  ⏳  Waiting for Kafka broker to be ready..."
-    kubectl rollout status statefulset/"$KAFKA_RELEASE_NAME" \
-      -n "$NAMESPACE" \
-      --timeout=300s || true
-    echo "  ✅  Kafka deployed"
+  if [ -n "$DRY_RUN" ]; then
+    kubectl apply -f "$kafka_manifest" -n "$NAMESPACE" --dry-run=client
+    return 0
   fi
 
+  kubectl apply -f "$kafka_manifest" -n "$NAMESPACE"
+
+  echo ""
+  echo "  ⏳  Waiting for Kafka StatefulSet to be ready..."
+  kubectl rollout status statefulset/kafka \
+    -n "$NAMESPACE" \
+    --timeout=180s
+
+  echo "  ✅  Kafka deployed"
   echo ""
 }
 
@@ -200,7 +172,7 @@ if [ -z "$DRY_RUN" ]; then
   echo "  kubectl get pods -n $NAMESPACE -w"
   echo ""
   echo "  Check Kafka status:"
-  echo "  kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=kafka"
+  echo "  kubectl get pods -n $NAMESPACE -l app=kafka"
   echo "============================================================"
 else
   echo "============================================================"

@@ -60,8 +60,9 @@ if [ -z "$TARGET_ENV" ]; then
 fi
 
 NAMESPACE="dd-$TARGET_ENV"
-KAFKA_RELEASE="kafka"
 TOPIC="content-events"
+# Binary path for apache/kafka image
+KAFKA_BIN="/opt/kafka/bin"
 
 echo ""
 echo -e "${BOLD}============================================================${NC}"
@@ -71,25 +72,17 @@ echo -e "  Namespace   : $NAMESPACE"
 echo -e "  Topic       : $TOPIC"
 echo -e "${BOLD}============================================================${NC}"
 
-# ── Helper: run a command inside a Kafka broker pod ──────────────────────────
+# ── Helper: run a command inside the Kafka pod ───────────────────────────────
 kafka_exec() {
   local cmd="$1"
-  kubectl exec -n "$NAMESPACE" \
-    "$(kubectl get pod -n "$NAMESPACE" -l "app.kubernetes.io/name=kafka,app.kubernetes.io/component=broker" \
-       -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || \
-     kubectl get pod -n "$NAMESPACE" -l "app.kubernetes.io/name=kafka" \
-       -o jsonpath='{.items[0].metadata.name}')" \
-    -- bash -c "$cmd" 2>/dev/null
-}
-
-# ── Helper: kubectl exec into a service pod ──────────────────────────────────
-svc_exec() {
-  local svc_label="$1"
-  local cmd="$2"
-  kubectl exec -n "$NAMESPACE" \
-    "$(kubectl get pod -n "$NAMESPACE" -l "app.kubernetes.io/name=$svc_label" \
-       -o jsonpath='{.items[0].metadata.name}')" \
-    -- sh -c "$cmd" 2>/dev/null
+  local pod
+  pod=$(kubectl get pod -n "$NAMESPACE" -l "app=kafka" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [ -z "$pod" ]; then
+    echo "ERROR: no kafka pod found"
+    return 1
+  fi
+  kubectl exec -n "$NAMESPACE" "$pod" -- bash -c "$cmd" 2>/dev/null
 }
 
 # ── Helper: kubectl port-forward in background ───────────────────────────────
@@ -101,7 +94,7 @@ start_portforward() {
   local remote_port="$3"
   kubectl port-forward -n "$NAMESPACE" "svc/$svc" "${local_port}:${remote_port}" &>/dev/null &
   PF_PIDS+=($!)
-  sleep 2   # give it time to bind
+  sleep 2
 }
 
 cleanup() {
@@ -125,15 +118,14 @@ fi
 
 # ── Test 2: Kafka pods are running ────────────────────────────────────────────
 header "Test 2: Kafka Pod Health"
-KAFKA_PODS=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=kafka" \
+KAFKA_PODS=$(kubectl get pods -n "$NAMESPACE" -l "app=kafka" \
   --no-headers 2>/dev/null || echo "")
 
 if [ -z "$KAFKA_PODS" ]; then
   fail "No Kafka pods found in $NAMESPACE"
 else
   info "Kafka pods:"
-  kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=kafka" \
-    --no-headers | while read -r line; do echo "    $line"; done
+  echo "$KAFKA_PODS" | while read -r line; do echo "    $line"; done
 
   NOT_RUNNING=$(echo "$KAFKA_PODS" | grep -v "Running" | grep -v "Completed" || true)
   if [ -z "$NOT_RUNNING" ]; then
@@ -146,14 +138,14 @@ fi
 
 # ── Test 3: Kafka topic exists ────────────────────────────────────────────────
 header "Test 3: Topic '$TOPIC' Exists"
-TOPIC_LIST=$(kafka_exec "/opt/bitnami/kafka/bin/kafka-topics.sh \
+TOPIC_LIST=$(kafka_exec "$KAFKA_BIN/kafka-topics.sh \
   --bootstrap-server localhost:9092 \
   --list" 2>/dev/null || echo "ERROR")
 
 if echo "$TOPIC_LIST" | grep -q "^${TOPIC}$"; then
   pass "Topic '$TOPIC' exists"
 
-  TOPIC_DESCRIBE=$(kafka_exec "/opt/bitnami/kafka/bin/kafka-topics.sh \
+  TOPIC_DESCRIBE=$(kafka_exec "$KAFKA_BIN/kafka-topics.sh \
     --bootstrap-server localhost:9092 \
     --describe --topic $TOPIC" 2>/dev/null || echo "")
 
@@ -166,7 +158,7 @@ elif echo "$TOPIC_LIST" | grep -q "ERROR"; then
 else
   warn "Topic '$TOPIC' not found. Provisioning may still be in progress."
   info "Creating topic manually..."
-  kafka_exec "/opt/bitnami/kafka/bin/kafka-topics.sh \
+  kafka_exec "$KAFKA_BIN/kafka-topics.sh \
     --bootstrap-server localhost:9092 \
     --create --if-not-exists \
     --topic $TOPIC \
@@ -181,7 +173,7 @@ TEST_MSG="verify-kafka-test-$(date +%s)"
 info "Sending test message: $TEST_MSG"
 
 # Produce
-PRODUCE_RESULT=$(kafka_exec "echo '$TEST_MSG' | /opt/bitnami/kafka/bin/kafka-console-producer.sh \
+PRODUCE_RESULT=$(kafka_exec "echo '$TEST_MSG' | $KAFKA_BIN/kafka-console-producer.sh \
   --bootstrap-server localhost:9092 \
   --topic $TOPIC 2>/dev/null && echo OK" || echo "FAILED")
 
@@ -193,7 +185,7 @@ fi
 
 # Consume (read from beginning, timeout after 10s)
 info "Consuming from topic (10s timeout)..."
-CONSUMED=$(kafka_exec "/opt/bitnami/kafka/bin/kafka-console-consumer.sh \
+CONSUMED=$(kafka_exec "$KAFKA_BIN/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 \
   --topic $TOPIC \
   --from-beginning \
@@ -214,7 +206,7 @@ fi
 
 # ── Test 5: Consumer group offset ─────────────────────────────────────────────
 header "Test 5: Consumer Group 'analytics-consumers'"
-GROUP_INFO=$(kafka_exec "/opt/bitnami/kafka/bin/kafka-consumer-groups.sh \
+GROUP_INFO=$(kafka_exec "$KAFKA_BIN/kafka-consumer-groups.sh \
   --bootstrap-server localhost:9092 \
   --describe --group analytics-consumers 2>/dev/null" || echo "")
 
@@ -222,8 +214,7 @@ if [ -n "$GROUP_INFO" ] && ! echo "$GROUP_INFO" | grep -q "does not exist"; then
   pass "Consumer group 'analytics-consumers' exists"
   info "Group details:"
   echo "$GROUP_INFO" | while read -r line; do echo "    $line"; done
-  
-  # Check lag
+
   LAG=$(echo "$GROUP_INFO" | awk 'NR>1 {sum += $6} END {print sum}' 2>/dev/null || echo "?")
   if [ "$LAG" = "0" ] || [ "$LAG" = "" ]; then
     pass "Consumer lag is 0 — analytics-service is keeping up"
@@ -241,10 +232,9 @@ header "Test 6: Service Kafka Status (via port-forward)"
 if kubectl get svc content-service -n "$NAMESPACE" &>/dev/null; then
   info "Port-forwarding content-service:3002 → localhost:13002"
   start_portforward "content-service" 13002 3002
-  
+
   CONTENT_HEALTH=$(curl -sf http://localhost:13002/health 2>/dev/null || echo '{"error":"unreachable"}')
-  KAFKA_STATUS=$(echo "$CONTENT_HEALTH" | grep -o '"kafka":"[^"]*"' || echo "unknown")
-  
+
   if echo "$CONTENT_HEALTH" | grep -q '"kafka":"connected"'; then
     pass "content-service Kafka producer: connected"
   elif echo "$CONTENT_HEALTH" | grep -q '"status":"ok"'; then
@@ -279,18 +269,15 @@ fi
 # ── Test 7: Full pipeline test (optional) ─────────────────────────────────────
 if [ "$SKIP_PIPELINE" = false ]; then
   header "Test 7: Full Pipeline (POST content → analytics stats)"
-  
-  # Check content-service port-forward is up
+
   if ! kill -0 "${PF_PIDS[0]:-0}" 2>/dev/null; then
     start_portforward "content-service" 13002 3002
   fi
 
-  # Get analytics event count before
   BEFORE_STATS=$(curl -sf http://localhost:13003/stats 2>/dev/null || echo '{"totalEvents":0}')
   BEFORE_COUNT=$(echo "$BEFORE_STATS" | grep -o '"totalEvents":[0-9]*' | grep -o '[0-9]*' || echo "0")
   info "Analytics events before test: $BEFORE_COUNT"
 
-  # POST a new content item (this triggers a Kafka event)
   TIMESTAMP=$(date +%s)
   POST_RESULT=$(curl -sf -X POST http://localhost:13002/items \
     -H "Content-Type: application/json" \
@@ -304,11 +291,9 @@ if [ "$SKIP_PIPELINE" = false ]; then
     fail "Failed to create content item: $POST_RESULT"
   fi
 
-  # Wait for the event to propagate through Kafka
   info "Waiting 5s for event to propagate through Kafka..."
   sleep 5
 
-  # Check analytics event count after
   AFTER_STATS=$(curl -sf http://localhost:13003/stats 2>/dev/null || echo '{"totalEvents":0}')
   AFTER_COUNT=$(echo "$AFTER_STATS" | grep -o '"totalEvents":[0-9]*' | grep -o '[0-9]*' || echo "0")
   info "Analytics events after test: $AFTER_COUNT"
