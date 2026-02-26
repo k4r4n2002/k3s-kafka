@@ -1,12 +1,13 @@
 {
     "name": "analytics-service",
-    "version": "1.0.0",
-    "description": "DisplayData — Analytics Ingestion & Retrieval Service",
+    "version": "2.0.0",
+    "description": "DisplayData — Analytics Ingestion & Retrieval Service (Kafka Consumer)",
     "main": "src/index.js",
     "scripts": {
         "start": "node src/index.js"
     },
     "dependencies": {
-        "express": "^4.21.2"
+        "express": "^4.21.2",
+        "kafkajs": "^2.2.4"
     }
 }

@@ -22,8 +22,10 @@ resources:
 configData:
   SERVICE_NAME: "content-service"
   ENVIRONMENT: "prod"
-  ANALYTICS_SERVICE_URL: "http://analytics-service:3003"
   LOG_LEVEL: "info"
+  # Kafka producer config
+  KAFKA_BROKERS: "kafka.dd-prod.svc.cluster.local:9092"
+  KAFKA_TOPIC: "content-events"
 
 secretData: {}
 

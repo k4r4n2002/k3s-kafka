@@ -1,0 +1,78 @@
+# ── Kafka (Bitnami) — Dev Environment ────────────────────────────────────────
+# Single-broker, no persistence, minimal resources — fast iteration
+replicaCount: 1
+
+# KRaft mode (no ZooKeeper dependency — Kafka 3.3+)
+kraft:
+  enabled: true
+
+# Listeners
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+# Advertised listeners (inside-cluster DNS)
+# Services connect via: kafka.dd-dev.svc.cluster.local:9092
+advertisedListeners: ""
+
+# No authentication for dev
+auth:
+  clientProtocol: plaintext
+  interBrokerProtocol: plaintext
+
+# No persistence — dev is ephemeral
+persistence:
+  enabled: false
+
+# Lightweight resources for dev
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Pre-create the topic on broker startup
+provisioning:
+  enabled: true
+  topics:
+    - name: content-events
+      partitions: 1
+      replicationFactor: 1
+      config:
+        retention.ms: "86400000"   # 1 day
+        cleanup.policy: "delete"
+
+# Service — ClusterIP only, accessible within dd-dev namespace
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+
+# Disable things not needed in dev
+zookeeper:
+  enabled: false
+
+metrics:
+  kafka:
+    enabled: false
+  jmx:
+    enabled: false
+
+# Single-broker KRaft settings
+controller:
+  replicaCount: 1
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

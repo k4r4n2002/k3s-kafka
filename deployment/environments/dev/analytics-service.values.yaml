@@ -20,6 +20,10 @@ configData:
   SERVICE_NAME: "analytics-service"
   ENVIRONMENT: "dev"
   LOG_LEVEL: "debug"
+  # Kafka consumer config
+  KAFKA_BROKERS: "kafka.dd-dev.svc.cluster.local:9092"
+  KAFKA_TOPIC: "content-events"
+  KAFKA_GROUP_ID: "analytics-consumers"
 
 secretData: {}
 

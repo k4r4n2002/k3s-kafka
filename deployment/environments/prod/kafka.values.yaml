@@ -1,0 +1,74 @@
+# ── Kafka (Bitnami) — Prod Environment ───────────────────────────────────────
+# 3-broker cluster, persistence enabled, higher resources
+
+replicaCount: 3
+
+# KRaft mode (no ZooKeeper)
+kraft:
+  enabled: true
+
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT
+
+auth:
+  clientProtocol: plaintext
+  interBrokerProtocol: plaintext
+
+# Persistent storage for prod
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""    # use cluster default StorageClass
+
+# Production-grade resources
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "2Gi"
+
+# Pre-create topics
+provisioning:
+  enabled: true
+  topics:
+    - name: content-events
+      partitions: 3
+      replicationFactor: 3
+      config:
+        retention.ms: "604800000"   # 7 days
+        cleanup.policy: "delete"
+        min.insync.replicas: "2"
+
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+
+zookeeper:
+  enabled: false
+
+metrics:
+  kafka:
+    enabled: true
+  jmx:
+    enabled: true
+
+controller:
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"

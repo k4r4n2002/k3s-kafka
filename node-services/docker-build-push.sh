@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # docker-build-push.sh — Build and push DisplayData service images to Docker Hub
 #
@@ -11,9 +11,14 @@
 #   - Docker installed and running
 #   - docker login completed (for push)
 #
+# Notes:
+#   - Kafka is deployed from the Bitnami Helm chart — no custom image needed.
+#   - content-service and analytics-service now include kafkajs; rebuild them
+#     after any changes to their Kafka producer/consumer logic.
+#
 # Images are tagged as:
-#   displaydata/<service>:latest
-#   displaydata/<service>:<git-short-sha>        (if inside a git repo)
+#   <DOCKER_ORG>/<service>:latest
+#   <DOCKER_ORG>/<service>:<git-short-sha>   (if inside a git repo)
 # =============================================================================
 
 set -euo pipefail
@@ -133,4 +138,7 @@ if [ "$BUILD_ALL" = true ]; then
 else
   echo "    $DOCKER_ORG/$TARGET_SERVICE:latest"
 fi
+echo ""
+echo "  Next step: deploy with"
+echo "    cd ../deployment && ./deploy.sh --env dev --all"
 echo ""
