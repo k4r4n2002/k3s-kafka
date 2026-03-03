@@ -1,0 +1,5 @@
+analytics-service-55cb5f5678-pnwvj   1/1   Running   0             29m
+api-gateway-7c46c9454f-m8pwc         1/1   Running   0             28m
+auth-service-7ff54789c6-lkkpg        1/1   Running   1 (33m ago)   4d22h
+content-service-75b9bc85cc-v9qds     1/1   Running   1 (33m ago)   4d21h
+kafka-0                              1/1   Running   0             30m

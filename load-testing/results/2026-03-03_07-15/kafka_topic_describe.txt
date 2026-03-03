@@ -1,0 +1,2 @@
+Topic: content-events	TopicId: kg7_t8roSr2jYzjvwDAkAw	PartitionCount: 1	ReplicationFactor: 1	Configs: cleanup.policy=delete,segment.bytes=1073741824,retention.ms=86400000
+	Topic: content-events	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 

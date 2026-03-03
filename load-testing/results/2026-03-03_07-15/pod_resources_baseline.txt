@@ -1,0 +1,6 @@
+NAME                                 CPU(cores)   MEMORY(bytes)   
+analytics-service-55cb5f5678-pnwvj   56m          20Mi            
+api-gateway-7c46c9454f-m8pwc         1m           14Mi            
+auth-service-7ff54789c6-lkkpg        1m           15Mi            
+content-service-75b9bc85cc-v9qds     1m           18Mi            
+kafka-0                              22m          368Mi           
