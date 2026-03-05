@@ -21,7 +21,7 @@ spec:
       containers:
         - name: {{ include "dd-service.fullname" . }}
           image: "{{ .Values.service.image }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

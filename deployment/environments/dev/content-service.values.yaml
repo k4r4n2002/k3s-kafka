@@ -6,7 +6,10 @@ service:
   type: ClusterIP
 
 hpa:
-  enabled: false
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  cpuThreshold: 50
 
 resources:
   requests:
